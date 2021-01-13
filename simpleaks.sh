@@ -26,12 +26,8 @@ function  sanitycheck ()
             echo -e "      \e[31mError\e[0m: No param passed to script. A cluster name is required to be passed to script"
             errors=$((errors+1))
       fi
-      if  isempty "SP_ID" "$SP_ID"; then 
-            errors=$((errors+1))
-      fi
-      if  isempty "SP_PASS" "$SP_PASS"; then 
-            errors=$((errors+1))
-      fi
+
+
       if  isempty "SUBSCRIPTIONID" "$SUBSCRIPTIONID"; then 
             errors=$((errors+1))
       fi  
@@ -43,6 +39,9 @@ function  sanitycheck ()
       fi  
       if  isempty "SUBNET_ID" "$SUBNET_ID"; then 
             echo -e "      \e[33mWarn\e[0m: SUBNET_ID not set. A new Azure Container Registry  will be created and used"
+      fi
+      if  isempty "AKS_IDENTITY_ID" "$AKS_IDENTITY_ID"; then 
+            echo -e "      \e[33mWarn\e[0m: AKS_IDENTITY_ID not set. A new user managed identity  will be created and used"
       fi
       if [ $errors -gt 0 ]; then
           echo -e "   \e[31mEncountered $errors in parameters. Please fix before continuing. exiting \e[0m "
@@ -58,6 +57,7 @@ echo "Creating cluster with name $aksname "
 
 RESOURCE_GROUP=$aksname
 AKS_CLUSTER=$aksname
+AKS_IDENTITY_NAME=$aksname
 INGRESS_SUBNET_ID=""
 
 network_prefix='10.3.0.0/16'
@@ -72,9 +72,20 @@ tags=`echo Environment=dev Project=minipoc Department=engineering`
 pool_tags=`echo Environment=dev Project=minipoc Department=engineering`
 
 ## az acr show --name aksonazure      --resource-group aksonazure      --query "id" --output tsv
-
+echo $LOCATION
 #Create a RG
 az group create --name  $RESOURCE_GROUP -l $LOCATION  --subscription $SUBSCRIPTIONID --tags $tags
+az identity create -g  $RESOURCE_GROUP -n $RESOURCE_GROUP
+if test -z "$AKS_IDENTITY_ID" 
+then
+      echo "AKS_IDENTITY_ID is empty, Gona create a Registry  in RG $RESOURCE_GROUP "
+      az identity create -n  $AKS_IDENTITY_NAME -g $RESOURCE_GROUP 
+      AKS_IDENTITY_ID="$(az identity show -n  $AKS_IDENTITY_NAME -g $RESOURCE_GROUP --query id -o tsv --subscription $SUBSCRIPTIONID)"
+      echo "created USER managed identity with id $AKS_IDENTITY_ID" 
+else
+      echo "\AKS_IDENTITY_ID is is NOT empty. using $AKS_IDENTITY_ID "
+fi
+
 if test -z "$ACR_REGISTRY" 
 then
       echo "ACR_REGISTRY is empty, Gona create a Registry  in RG $RESOURCE_GROUP "
@@ -116,20 +127,27 @@ fi
 echo $SUBNET_ID
 ## --service-principal $SP_ID \
 ## --client-secret $SP_PASS \
+echo managed identity $AKS_IDENTITY_ID
+USER_ASSIGNED_IDENTITY_CLIENTID="$(  az identity show  --ids $AKS_IDENTITY_ID --query clientId -o tsv)"
+AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
+AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
+echo $AKS_VNET_RG ..... $AKS_VNET .... $USER_ASSIGNED_IDENTITY_CLIENTID
+
+az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
 
 #Create AKS Cluster with Service Principle
 az aks create \
- --service-principal $SP_ID \
- --client-secret $SP_PASS \
  --resource-group $RESOURCE_GROUP \
  --network-plugin $NETWORK_PLUGIN \
  --node-count $MIN_NODE_COUNT \
  --node-vm-size=$VM_SIZE \
  --kubernetes-version=$KUBE_VERSION \
  --name $AKS_CLUSTER \
- --docker-bridge-address "19.5.0.1/16" \
+ --docker-bridge-address "172.17.0.1/16" \
  --dns-service-ip "10.19.0.10" \
  --service-cidr "10.19.0.0/16" \
+ --pod-cidr "10.244.0.0/16" \
  --location $LOCATION \
  --enable-addons monitoring \
  --vm-set-type "VirtualMachineScaleSets"   \
@@ -144,22 +162,40 @@ az aks create \
  --nodepool-tags $pool_tags \
  --nodepool-labels $pool_tags \
  --generate-ssh-keys \
+ --zones 3 \
  --node-resource-group $RESOURCE_GROUP-managed \
+ --attach-acr $ACR_REGISTRY \
  --enable-managed-identity \
- --skip-subnet-role-assignment \
- --zones 3 --attach-acr $ACR_REGISTRY 
-##  --enable-aad \
-## --aad-admin-group-object-ids "f7976ea3-24ae-40a2-b546-00c369910444" \
+ --assign-identity $AKS_IDENTITY_ID
+ 
+#  --node-resource-group $RESOURCE_GROUP-managed \
+# --aks-custom-headers usegen2vm=true --enable-pod-identity  \
+ az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP 
+
+
+
+## get the managed identity 
+#USER_ASSIGNED_IDENTITY_CLIENTID="$(  az identity show  --name $AKS_IDENTITY_NAME  -g $RESOURCE_GROUP  --query clientId -o tsv)"
+#AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
+#AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
+
+#az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+#az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+
 echo "adding system pool "
-az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnodes --node-taints CriticalAddonsOnly=true:NoSchedule --mode system
+az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnodes --node-taints CriticalAddonsOnly=true:NoSchedule --mode system --node-count=1
 echo "traefik ingress pool"
 if  isempty "INGRESS_SUBNET_ID" "$INGRESS_SUBNET_ID"; then 
      echo -e "      \e[31mError\e[0m: no ingress subnet id found. will not create pool"
      errors=$((errors+1))
 else 
-      az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n ingress --vnet-subnet-id $INGRESS_SUBNET_ID --node-taints IngressOnly=true:NoSchedule --node-count=2 --node-count=2 --tags="Ingress=true"
-
+      az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n ingress --vnet-subnet-id $INGRESS_SUBNET_ID --node-taints IngressOnly=true:NoSchedule --node-count=1  --tags="Ingress=true"
 fi
+## remove normal pool. Cos you cannot update the min to zero 
+
+az aks nodepool delete -g  $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n basepool 
+## 
+az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count 0 --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
 
 # security policy  
 
@@ -173,7 +209,7 @@ kubectl create clusterrolebinding kubernetes-dashboard --clusterrole=cluster-adm
 ## see https://strimzi.io/docs/operators/master/using.html#deploying-cluster-operator-helm-chart-str
 helm repo add strimzi https://strimzi.io/charts/
 
-helm install strimy strimzi/strimzi-kafka-operator    -n kafka --set watchAnyNamespace=true
+helm install strimy strimzi/strimzi-kafka-operator -n kafka --set watchAnyNamespace=true
 kubectl create clusterrolebinding strimzi-cluster-operator-namespaced --clusterrole=strimzi-cluster-operator-namespaced --serviceaccount kafka:strimzi-cluster-operator
 kubectl create clusterrolebinding strimzi-cluster-operator-entity-operator-delegation --clusterrole=strimzi-entity-operator --serviceaccount kafka:strimzi-cluster-operator
 kubectl create clusterrolebinding strimzi-cluster-operator-topic-operator-delegation --clusterrole=strimzi-topic-operator --serviceaccount kafka:strimzi-cluster-operator

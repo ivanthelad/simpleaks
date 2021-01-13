@@ -53,12 +53,14 @@ DISK_ENCRYPTION_SET_ID=""
 ### Previews Prereq
 
 Please ensure the following previews are enabled.
+** the script uses BYO managed identity preview. This means it precreates a user managed identity to be used on the managment plane. if you don't want this preview then you can simply comment out its usage in the script. [See line !](https://github.com/ivanthelad/simpleaks/blob/master/cmk/simpleaks_cmk.sh#L145) 
 ** https://docs.microsoft.com/en-us/azure/aks/enable-host-encryption
 ** https://docs.microsoft.com/en-us/azure/aks/use-managed-identity#bring-your-own-control-plane-mi-preview
  
 #### Step for prereqs
 * az extension add --name aks-preview
 * az extension update --name aks-preview
+* az feature register --name UserAssignedIdentityPreview --namespace Microsoft.ContainerService
 * az feature register --name UserAssignedIdentityPreview --namespace Microsoft.ContainerService
 * :warning: Ensure you reregister the container service after the preview is registered 
 * az provider register --namespace Microsoft.ContainerService

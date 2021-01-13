@@ -146,8 +146,6 @@ echo "Creating AKS Cluster "
 
 #Create AKS Cluster with Service Principle
 az aks create \
- --service-principal $SP_ID \
- --client-secret $SP_PASS \
  --resource-group $RESOURCE_GROUP \
  --network-plugin $NETWORK_PLUGIN \
  --node-count $MIN_NODE_COUNT \
@@ -174,9 +172,47 @@ az aks create \
  --node-resource-group $RESOURCE_GROUP-managed \
  --enable-managed-identity \
  --skip-subnet-role-assignment \
- --zones 3 
+ --zones 3 --attach-acr $ACR_REGISTRY 
+## Get creds 
+az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP
+
 ##  --enable-aad \
 ## --aad-admin-group-object-ids "f7976ea3-24ae-40a2-b546-00c369910444" \
+
+
+## get the managed identity 
+SYSTEM_MANAGED_IDENTITY="$(az aks show -n $AKS_CLUSTER -g $RESOURCE_GROUP  --query [identity.principalId] -o tsv)"
+AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
+AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
+az role assignment create --assignee $SYSTEM_MANAGED_IDENTITY --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+az role assignment create --assignee $SYSTEM_MANAGED_IDENTITY --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+
+echo "adding system pool "
+az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnodes --node-taints CriticalAddonsOnly=true:NoSchedule --mode system --node-count=1
+echo "traefik ingress pool"
+if  isempty "INGRESS_SUBNET_ID" "$INGRESS_SUBNET_ID"; then 
+     echo -e "      \e[31mError\e[0m: no ingress subnet id found. will not create pool"
+     errors=$((errors+1))
+else 
+      az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n ingress --vnet-subnet-id $INGRESS_SUBNET_ID --node-taints IngressOnly=true:NoSchedule --node-count=1  --tags="Ingress=true"
+
+fi
+## remove normal pool. Cos you cannot update the min to zero 
+
+az aks nodepool delete -g  $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n basepool 
+## 
+az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count 0 --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
+
+# security policy  
+
+# --enable-pod-security-policy  \
+az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP
+
+exit 0;
+
+
+
+
  
 
 ### ADDing appGW 
@@ -196,16 +232,4 @@ az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnode
 az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP
 
 exit 0;
-##https://strimzi.io/docs/latest/full.html#deploying-cluster-operator-helm-chart-str
-kubectl  create namespace kafka
-kubectl create clusterrolebinding kubernetes-dashboard --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
-## see https://strimzi.io/docs/operators/master/using.html#deploying-cluster-operator-helm-chart-str
-helm repo add strimzi https://strimzi.io/charts/
 
-helm install strimy strimzi/strimzi-kafka-operator    -n kafka --set watchAnyNamespace=true
-kubectl create clusterrolebinding strimzi-cluster-operator-namespaced --clusterrole=strimzi-cluster-operator-namespaced --serviceaccount kafka:strimzi-cluster-operator
-kubectl create clusterrolebinding strimzi-cluster-operator-entity-operator-delegation --clusterrole=strimzi-entity-operator --serviceaccount kafka:strimzi-cluster-operator
-kubectl create clusterrolebinding strimzi-cluster-operator-topic-operator-delegation --clusterrole=strimzi-topic-operator --serviceaccount kafka:strimzi-cluster-operator
-kubectl set env deployment strimzi-cluster-operator STRIMZI_NAMESPACE="*" 
-kafkaversion="0.18.0"
-kubectl apply -f https://raw.githubusercontent.com/strimzi/strimzi-kafka-operator/$kafkaversion/examples/kafka/kafka-persistent.yaml

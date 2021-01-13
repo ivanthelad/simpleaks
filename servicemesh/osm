@@ -1,0 +1,6 @@
+download latest osm 
+ - https://github.com/openservicemesh/osm/releases
+ -  sudo mv ./osm /usr/local/bin/osm
+ 
+
+osm install

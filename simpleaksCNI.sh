@@ -117,9 +117,6 @@ echo $SUBNET_ID
 ## --service-principal $SP_ID \
 ## --client-secret $SP_PASS \
 
-# setting 
-
-NETWORK_PLUGIN="azure"
 #Create AKS Cluster with Service Principle
 az aks create \
  --service-principal $SP_ID \
@@ -150,7 +147,7 @@ az aks create \
  --node-resource-group $RESOURCE_GROUP-managed \
  --enable-managed-identity \
  --skip-subnet-role-assignment \
- --zones 3 
+ --zones 3 --attach-acr $ACR_REGISTRY 
 ##  --enable-aad \
 ## --aad-admin-group-object-ids "f7976ea3-24ae-40a2-b546-00c369910444" \
 echo "adding system pool "
