@@ -2,8 +2,9 @@
 
 kubectl create namespace nginx
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-
-
+ helm repo update
+helm search repo nginx
+kubectl create namespace nginx
 helm install my-release ingress-nginx/ingress-nginx --set controller.admissionWebhooks.enabled=false -n nginx --set controller.metrics.serviceMonitor.enabled=true --set controller.metrics.enabled=true
 
 ### Modify customer error pages 

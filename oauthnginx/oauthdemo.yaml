@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ing
+  name: aks-helloworld-one  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aks-helloworld-one
+  template:
+    metadata:
+      labels:
+        app: aks-helloworld-one
+    spec:
+      containers:
+      - name: aks-helloworld-one
+        image: mcr.microsoft.com/azuredocs/aks-helloworld:v1
+        ports:
+        - containerPort: 80
+        env:
+        - name: TITLE
+          value: "Welcome to Azure Kubernetes Service (AKS)"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ing
+  name: aks-helloworld-one  
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    app: aks-helloworld-one
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ing
+  labels:
+    k8s-app: oauth2-proxy
+  name: oauth2-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        k8s-app: oauth2-proxy
+    spec:
+      containers:
+      - args:
+        - --provider=github
+        - --email-domain=*
+        - --upstream=file:///dev/null
+        - --http-address=0.0.0.0:4180
+  #      - --pass-access-token=true
+   #     - --skip-provider-button=true
+  #      - --set-authorization-header=true
+ #       - --cookie-expire=2h0m0s
+  #      - --cookie-refresh=0
+ #       - --ssl-insecure-skip-verify=false
+#        - --set-xauthrequest=true        
+        # Register a new application
+        # https://github.com/settings/applications/new
+        env:
+        - name: OAUTH2_PROXY_CLIENT_ID
+          value: xxxxx
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          value: xxxxx 
+        # docker run -ti --rm python:3-alpine python -c 'import secrets,base64; print(base64.b64encode(base64.b64encode(secrets.token_bytes(16))));'
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          value: xxxxx
+        image: quay.io/oauth2-proxy/oauth2-proxy:latest
+        imagePullPolicy: Always
+        name: oauth2-proxy
+        ports:
+        - containerPort: 4180
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ing
+  labels:
+    k8s-app: oauth2-proxy
+  name: oauth2-proxy
+spec:
+  ports:
+  - name: http
+    port: 4180
+    protocol: TCP
+    targetPort: 4180
+  selector:
+    k8s-app: oauth2-proxy
+--- 
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  namespace: ing
+  name: oauth2-proxy
+spec:
+  rules:
+  - host: userapi.aksonazure.com
+    http:
+      paths:
+      - pathType: Prefix
+        backend:
+          serviceName: oauth2-proxy
+          servicePort: 4180
+        path: /oauth2
+  tls:
+  - hosts:
+    - userapi.aksonazure.com
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  namespace: ing
+  name: hello-world-ingress-static
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/auth-url: 'https://userapi.aksonazure.com/oauth2/auth'
+    nginx.ingress.kubernetes.io/auth-signin: 'https://userapi.aksonazure.com/oauth2/start?rd=/redirect/$http_host$escaped_request_uri'
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "10s"
+spec:
+  rules:
+  - host: userapi.aksonazure.com
+    http:
+      paths:
+      - backend:
+          serviceName: aks-helloworld-one
+          servicePort: 80
+        path: / 
+  tls:
+  - hosts:
+    - userapi.aksonazure.com

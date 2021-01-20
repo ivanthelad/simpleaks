@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    meta.helm.sh/release-name: springapp
+    meta.helm.sh/release-namespace: default
+    nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User, X-Auth-Request-Email, X-Auth-Request-Access-Token, Set-Cookie, Authorization
+    nginx.ingress.kubernetes.io/auth-url: 'https://userapi.aksonazure.com/oauth2/auth'
+    nginx.ingress.kubernetes.io/auth-signin: 'https://userapi.aksonazure.com/oauth2/start?rd=/redirect/$http_host$escaped_request_uri'
+    nginx.ingress.kubernetes.io/auth-snippet: | 
+      if ( $request_uri = "/nonmember" ) {
+          return 200;
+      }
+#    nginx.ingress.kubernetes.io/auth-url: http://userapi.aksonazure.com/oauth2/auth   
+#    nginx.ingress.kubernetes.io/auth-signin: 'https://userapi.aksonazure.com/oauth2/start'
+ #   nginx.ingress.kubernetes.io/auth-response-headers: 'x-auth-request-user, x-auth-request-email, Authorization, X-Auth-Request-Access-Token' 
+  labels:
+    app.kubernetes.io/instance: springapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: userapi
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: springapp-0.1.0
+  name: userapi1
+  namespace: default
+#        proxy_redirect ~^(http://[^:]+):\d+(/.+)$ $1$2;
+## https://stackoverflow.com/questions/19568452/modifying-a-location-header-with-nginx-proxy-pass
+#https://github.com/oauth2-proxy/oauth2-proxy/issues/827
+## https://github.com/oauth2-proxy/oauth2-proxy/issues/920
+# resolver 127.0.0.1 valid=60s ipv6=off;
+spec:
+  rules:
+  - host: userapi.aksonazure.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: userapi
+            port:
+              number: 8080
+      - pathType: Prefix
+        backend:
+          service:
+            name: oauth2-proxy
+            port:
+              number: 4180
+        path: /oauth2
+  tls:
+  - hosts:
+    - userapi.aksonazure.com
