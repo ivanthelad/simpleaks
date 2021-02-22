@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: my-release
+    meta.helm.sh/release-namespace: nginx
+  creationTimestamp: "2021-01-15T12:13:54Z"
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: my-release
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/version: 0.43.0
+    helm.sh/chart: ingress-nginx-3.20.0
+  name: my-release-ingress-nginx-controller
+  namespace: nginx
+data:
+  http-snippet: |
+    proxy_cache_path    /tmp/nginx_cache levels=1:2 keys_zone=nginx_cache:10m max_size=500M use_temp_path=off inactive=5h;
+
+ 

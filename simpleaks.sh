@@ -167,7 +167,8 @@ az aks create \
  --attach-acr $ACR_REGISTRY \
  --enable-managed-identity \
  --assign-identity $AKS_IDENTITY_ID
- 
+
+
 #  --node-resource-group $RESOURCE_GROUP-managed \
 # --aks-custom-headers usegen2vm=true --enable-pod-identity  \
  az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP 
@@ -195,7 +196,7 @@ fi
 
 az aks nodepool delete -g  $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n basepool 
 ## 
-az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count 0 --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
+az aks nodepool add --zones 3 --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count 1 --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
 
 # security policy  
 

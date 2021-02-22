@@ -1,0 +1,10 @@
+## get secret kubectl get secret zoneaware-es-elastic-user -o=jsonpath='{.data.elastic}' | base64 --decode; echo
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: zoneaware
+spec:
+  version: 7.11.1
+  count: 2
+  elasticsearchRef:
+    name: zoneaware

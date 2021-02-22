@@ -1,0 +1,86 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: zoneaware
+spec:
+  secureSettings:
+  - secretName: essecret
+
+ 
+ 
+#  - azure.client.default.account: elasticstor
+#  - azure.client.default.endpoint_suffix: core.windows.net
+#  - azure.client.default.max_retries: 3
+#  - azure.client.default.sas_token: sp=racwdl&st=2021-02-22T07:44:38Z&se=2021-02-22T15:44:38Z&spr=https&sv=2020-02-10&sr=c&sig=Ts3u2T%2FKe9XtaV%2FiDr1rOCZAfzZ%2Fn5ZWHcawItOPyCI%3D
+  version: 7.11.1
+  nodeSets:
+  - name: default
+    count: 3
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+        storageClassName: managed-premium-zoneaware
+    ## next configure watcher https://www.elastic.co/guide/en/elasticsearch/reference/current/backup-cluster-data.html
+    config:
+       ## remove specific roles. making them all by default the same https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
+      ##  node.roles: ["master", "data", "ingest", "ml"]
+      # this allows ES to run on nodes even if their vm.max_map_count has not been increased, at a performance cost
+      node.store.allow_mmap: false
+      ## https://www.elastic.co/guide/en/elasticsearch/plugins/current/repository-azure-usage.html
+      ## https://www.elastic.co/guide/en/elasticsearch/plugins/master/repository-azure-client-settings.html
+ #     azure.client.default.account: elasticstor
+ #     azure.client.default.endpoint_suffix: core.windows.net
+ #     azure.client.default.max_retries: 3
+ #     azure.client.default.sas_token: sp=racwdl&st=2021-02-22T07:44:38Z&se=2021-02-22T15:44:38Z&spr=https&sv=2020-02-10&sr=c&sig=Ts3u2T%2FKe9XtaV%2FiDr1rOCZAfzZ%2Fn5ZWHcawItOPyCI%3D
+    podTemplate:
+      metadata:
+        labels:
+          # additional labels for pods
+          app: elasticsearch
+      spec:
+        initContainers:
+        - name: install-plugins-azure
+          command:
+          - sh
+          - -c
+          - |
+            bin/elasticsearch-plugin install --batch repository-azure
+        topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: failure-domain.beta.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: elasticsearch
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: elasticsearch
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: agentpool
+                  operator: In
+                  values:
+                  - elastic
+
+        containers:
+        - name: elasticsearch
+          # specify resource limits and requests
+          resources:
+            limits:
+              memory: 4Gi
+              cpu: 1
+          env:
+          - name: ES_JAVA_OPTS
+            value: "-Xms2g -Xmx2g"

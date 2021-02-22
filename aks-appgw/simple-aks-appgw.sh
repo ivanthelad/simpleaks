@@ -145,6 +145,16 @@ az keyvault create --name "${aksname}-kv" --resource-group $RESOURCE_GROUP --loc
 echo "Creating AKS Cluster "
 
 #Create AKS Cluster with Service Principle
+echo managed identity $AKS_IDENTITY_ID
+USER_ASSIGNED_IDENTITY_CLIENTID="$(  az identity show  --ids $AKS_IDENTITY_ID --query clientId -o tsv)"
+AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
+AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
+echo $AKS_VNET_RG ..... $AKS_VNET .... $USER_ASSIGNED_IDENTITY_CLIENTID
+
+az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+
+#Create AKS Cluster with Service Principle
 az aks create \
  --resource-group $RESOURCE_GROUP \
  --network-plugin $NETWORK_PLUGIN \
@@ -152,9 +162,10 @@ az aks create \
  --node-vm-size=$VM_SIZE \
  --kubernetes-version=$KUBE_VERSION \
  --name $AKS_CLUSTER \
- --docker-bridge-address "19.5.0.1/16" \
+ --docker-bridge-address "172.17.0.1/16" \
  --dns-service-ip "10.19.0.10" \
  --service-cidr "10.19.0.0/16" \
+ --pod-cidr "10.244.0.0/16" \
  --location $LOCATION \
  --enable-addons monitoring \
  --vm-set-type "VirtualMachineScaleSets"   \
@@ -169,23 +180,25 @@ az aks create \
  --nodepool-tags $pool_tags \
  --nodepool-labels $pool_tags \
  --generate-ssh-keys \
+ --zones 3 \
  --node-resource-group $RESOURCE_GROUP-managed \
+ --attach-acr $ACR_REGISTRY \
  --enable-managed-identity \
- --skip-subnet-role-assignment \
- --zones 3 --attach-acr $ACR_REGISTRY 
-## Get creds 
-az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP
+ --assign-identity $AKS_IDENTITY_ID
+ 
+#  --node-resource-group $RESOURCE_GROUP-managed \
+# --aks-custom-headers usegen2vm=true --enable-pod-identity  \
+ az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP 
 
-##  --enable-aad \
-## --aad-admin-group-object-ids "f7976ea3-24ae-40a2-b546-00c369910444" \
 
 
 ## get the managed identity 
-SYSTEM_MANAGED_IDENTITY="$(az aks show -n $AKS_CLUSTER -g $RESOURCE_GROUP  --query [identity.principalId] -o tsv)"
-AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
-AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
-az role assignment create --assignee $SYSTEM_MANAGED_IDENTITY --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
-az role assignment create --assignee $SYSTEM_MANAGED_IDENTITY --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+#USER_ASSIGNED_IDENTITY_CLIENTID="$(  az identity show  --name $AKS_IDENTITY_NAME  -g $RESOURCE_GROUP  --query clientId -o tsv)"
+#AKS_VNET_RG=$(echo $SUBNET_ID|cut -d'/' -f 5) 
+#AKS_VNET=$(echo $SUBNET_ID| cut -d'/' -f 9)
+
+#az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
+#az role assignment create --assignee $USER_ASSIGNED_IDENTITY_CLIENTID --role "Network Contributor" --scope /subscriptions/$SUBSCRIPTIONID/resourceGroups/$AKS_VNET_RG/providers/Microsoft.Network/virtualNetworks/$AKS_VNET
 
 echo "adding system pool "
 az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnodes --node-taints CriticalAddonsOnly=true:NoSchedule --mode system --node-count=1
@@ -195,7 +208,6 @@ if  isempty "INGRESS_SUBNET_ID" "$INGRESS_SUBNET_ID"; then
      errors=$((errors+1))
 else 
       az aks nodepool add --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n ingress --vnet-subnet-id $INGRESS_SUBNET_ID --node-taints IngressOnly=true:NoSchedule --node-count=1  --tags="Ingress=true"
-
 fi
 ## remove normal pool. Cos you cannot update the min to zero 
 
@@ -213,23 +225,4 @@ exit 0;
 
 
 
- 
-
-### ADDing appGW 
-appgwId=$(az network application-gateway show -n $gw_name -g $RESOURCE_GROUP -o tsv --query "id") 
-echo "App Gatewayid $appgwId, enabling addon" 
-az aks enable-addons -n $AKS_CLUSTER -g $RESOURCE_GROUP -a ingress-appgw --appgw-id $appgwId
-echo "successfully added addon for app gw "
-
-echo "Adding system pool  "
-az aks nodepool add -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n systemnodes --node-taints CriticalAddonsOnly=true:NoSchedule --mode system
-# security policy 
-
-### https://azure.github.io/application-gateway-kubernetes-ingress/annotations/#list-of-supported-annotations
-
-# --enable-pod-security-policy  \
-
-az aks get-credentials -n $AKS_CLUSTER -g $RESOURCE_GROUP
-
-exit 0;
 

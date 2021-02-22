@@ -58,6 +58,9 @@ spec:
         - --email-domain=*
         - --upstream=file:///dev/null
         - --http-address=0.0.0.0:4180
+        - --cookie-expire=10s
+        - --cookie-refresh=0
+        - --set-authorization-header=true
   #      - --pass-access-token=true
    #     - --skip-provider-button=true
   #      - --set-authorization-header=true
