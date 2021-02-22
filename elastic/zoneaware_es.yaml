@@ -5,13 +5,6 @@ metadata:
 spec:
   secureSettings:
   - secretName: essecret
-
- 
- 
-#  - azure.client.default.account: elasticstor
-#  - azure.client.default.endpoint_suffix: core.windows.net
-#  - azure.client.default.max_retries: 3
-#  - azure.client.default.sas_token: sp=racwdl&st=2021-02-22T07:44:38Z&se=2021-02-22T15:44:38Z&spr=https&sv=2020-02-10&sr=c&sig=Ts3u2T%2FKe9XtaV%2FiDr1rOCZAfzZ%2Fn5ZWHcawItOPyCI%3D
   version: 7.11.1
   nodeSets:
   - name: default
@@ -34,10 +27,8 @@ spec:
       node.store.allow_mmap: false
       ## https://www.elastic.co/guide/en/elasticsearch/plugins/current/repository-azure-usage.html
       ## https://www.elastic.co/guide/en/elasticsearch/plugins/master/repository-azure-client-settings.html
- #     azure.client.default.account: elasticstor
- #     azure.client.default.endpoint_suffix: core.windows.net
- #     azure.client.default.max_retries: 3
- #     azure.client.default.sas_token: sp=racwdl&st=2021-02-22T07:44:38Z&se=2021-02-22T15:44:38Z&spr=https&sv=2020-02-10&sr=c&sig=Ts3u2T%2FKe9XtaV%2FiDr1rOCZAfzZ%2Fn5ZWHcawItOPyCI%3D
+
+
     podTemplate:
       metadata:
         labels:
