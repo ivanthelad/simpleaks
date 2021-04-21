@@ -1,0 +1,1 @@
+kubectl run tmp-shell --rm -i --tty --generator=run-pod/v1 --image nicolaka/netshoot -- /bin/bash

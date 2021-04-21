@@ -149,7 +149,7 @@ az aks create \
  --service-cidr "10.19.0.0/16" \
  --pod-cidr "10.244.0.0/16" \
  --location $LOCATION \
- --enable-addons monitoring \
+ --enable-addons monitoring,open-service-mesh \
  --vm-set-type "VirtualMachineScaleSets"   \
  --tags $tags \
  --nodepool-name="basepool" \
@@ -196,7 +196,7 @@ fi
 
 az aks nodepool delete -g  $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n basepool 
 ## 
-az aks nodepool add --zones 1 2 3 --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count $MIN_NODE_COUNT --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
+az aks nodepool add --zones 3 --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count $MIN_NODE_COUNT --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
 
 # security policy  
 

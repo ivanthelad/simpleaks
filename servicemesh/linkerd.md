@@ -28,6 +28,9 @@ kubectl get -n booksapp deploy -o yaml \
   | linkerd inject - \
   | kubectl apply -f -
 
+
+kubectl get -n prod deploy -o yaml  | linkerd inject -   | kubectl apply -f -
+
 ## Expose linkerd dashboard 
 linkerd dashboard &
  
@@ -39,3 +42,23 @@ export PATH=$PATH:$HOME/.linkerd2/bin
 kubectl get -n emojivoto deploy -o yaml \
   | linkerd inject - \
   | kubectl apply -f -
+
+
+
+
+### remove 
+kubectl get -n prod deploy -o yaml  | linkerd uninject -   | kubectl apply -f -
+
+
+
+
+## install 
+ curl -sL run.linkerd.io/install | sh
+ linkerd viz install | kubectl apply -f -
+kubectl get -n prod deploy -o yaml  | linkerd uninject -   | kubectl apply -f -
+kubectl get -n nginx  deploy -o yaml  | linkerd inject -   | kubectl apply -f -
+## verify 
+linkerd viz stat deployments -n prod
+## view dashboard 
+linkerd viz dashboard &
+kubectl port-forward  service/web -n linkerd-viz 8084:8084

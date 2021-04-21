@@ -20,7 +20,6 @@ function  isempty ()
 }
 function  sanitycheck ()
 {
-
       errors=0;
       if  isempty "clusternameparam" "$clusternameparam"; then 
             echo -e "      \e[31mError\e[0m: No param passed to script. A cluster name is required to be passed to script"
@@ -31,6 +30,15 @@ function  sanitycheck ()
       if  isempty "SUBSCRIPTIONID" "$SUBSCRIPTIONID"; then 
             errors=$((errors+1))
       fi  
+      if  isempty "AAD_ADMIN_GROUP_ID" "$AAD_ADMIN_GROUP_ID"; then 
+            echo -e "      \e[33mWarn\e[0m: AAD_ADMIN_GROUP_ID not set. Fix me "
+            errors=$((errors+1))
+      fi
+      if  isempty "AAD_TENANT_ID" "$AAD_TENANT_ID"; then
+             echo -e "      \e[33mWarn\e[0m: AAD_TENANT_ID not set. Fix me "
+
+            errors=$((errors+1))
+      fi
       if  isempty "WORKSPACE_ID" "$WORKSPACE_ID"; then 
             echo -e "      \e[33mWarn\e[0m: WORKSPACE_ID not set. A new log analytics workspace will be created and used"
       fi  
@@ -166,6 +174,7 @@ az aks create \
  --node-resource-group $RESOURCE_GROUP-managed \
  --attach-acr $ACR_REGISTRY \
  --enable-managed-identity \
+ --enable-aad --aad-admin-group-object-ids $AAD_ADMIN_GROUP_ID --aad-tenant-id $AAD_TENANT_ID \
  --assign-identity $AKS_IDENTITY_ID
 
 
@@ -196,7 +205,7 @@ fi
 
 az aks nodepool delete -g  $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n basepool 
 ## 
-az aks nodepool add --zones 1 2 3 --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count $MIN_NODE_COUNT --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
+az aks nodepool add --zones 3 --mode user -g $RESOURCE_GROUP --cluster-name $AKS_CLUSTER -n apppool --tags="Apps=true" --min-count $MIN_NODE_COUNT --max-count $MAX_NODE_COUNT  --enable-cluster-autoscaler
 
 # security policy  
 

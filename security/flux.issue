@@ -1,0 +1,5 @@
+
+
+The flux deployment is configured to perform node restart between 9:00 - 15:00. Node reboots are required sometimes when with nightly updates a kernal update is applied 
+
+

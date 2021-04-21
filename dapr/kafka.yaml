@@ -1,0 +1,20 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-pubsub
+  namespace: default
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+      # Kafka broker connection setting
+    - name: brokers
+      value: "dapr-kafka.myapp.svc.cluster.local:9092"
+    - name: authRequired
+      value: "true"
+    - name: saslUsername
+      value: "adminuser"
+    - name: saslPassword
+      value: "KeFg23!"
+    - name: maxMessageBytes
+      value: 1024

@@ -1,0 +1,30 @@
+{"Title": "WO-0123-089","DeliveryTo": "Plant München","Position": 1,"RowID": 1,"Amount": 67,}
+
+ 
+
+{"Title": "WO-0123-089","DeliveryTo": "Plant München","Position": 2,"RowID": 2,"Amount": 48,}
+
+ 
+
+{"Title": "WO-0123-089","DeliveryTo": "Plant München","Position": 3,"RowID": 3,"Amount": 11}
+
+ 
+
+{"Title": "WO-0123-089","DeliveryTo": "Plant München","Position": 4,"RowID": 4,"Amount": 23}
+
+ 
+
+{"Title": "WO-0123-089","DeliveryTo": "Plant München","Position": 5,"RowID": 5,"Amount": 17}
+
+ {"Title": "WO-0123-458","DeliveryTo": "Plant München","Position": [1,2,3,4,5,], "PartID": ["P-098-767", "P-098-768", "P-098-769", "P-098-766", "P-098-765"], Amount: [31,32,39,31,20]}
+
+
+cd /windir/c/Users/ivmckinl/projects/aks/kafkaclient/kafka_2.13-2.7.0/bin
+
+## Run the creator 
+kubectl  run kafka-producer -ti --image=strimzi/kafka:0.20.1-kafka-2.5.0 --rm=true --restart=Never -- bin/kafka-console-producer.sh --broker-list my-cluster-kafka-bootstrap:9092 --topic testeh
+
+### run listener 
+./kafka-console-consumer.sh --bootstrap-server xxxxx.servicebus.windows.net:9093 --topic my-cluster.testeh --consumer.config kafka_eventhub.properties
+
+
